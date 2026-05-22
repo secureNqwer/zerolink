@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/secureNqwer/zerolink/core"
+	"github.com/secureNqwer/zerolink/gui"
 	"github.com/secureNqwer/zerolink/messenger"
 	"github.com/secureNqwer/zerolink/version"
 )
@@ -34,7 +35,8 @@ type authData struct {
 const authFile = "auth.json"
 
 func main() {
-	cliMode     := flag.Bool("cli", false, "start CLI mode (default is web UI)")
+	cliMode     := flag.Bool("cli", false, "start CLI mode")
+	desktopMode := flag.Bool("gui", false, "start native desktop GUI (Fyne)")
 	showVer     := flag.Bool("version", false, "show version")
 	installMode := flag.Bool("install", false, "install Zerolink system-wide")
 	uninstallMode := flag.Bool("uninstall", false, "remove Zerolink from system")
@@ -116,13 +118,17 @@ func main() {
 		runGuidedSetup(ctx, m)
 	}
 
-	// ─── Mode selection: CLI (-cli) or GUI (default) ────────────────
+	// ─── Mode selection ───────────────────────────────────────────
+	if *desktopMode {
+		gui.Run(m, nil)
+		return
+	}
 	if *cliMode {
 		cliLoop(ctx, m, log, quit, cancel)
 		return
 	}
 
-	// ─── GUI mode (default) ────────────────────────────────────────────
+	// ─── Web UI mode (default) ─────────────────────────────────────────
 	webui := messenger.NewWebUI(m)
 	addr := ":8081"
 	fmt.Printf("\n  Web UI: http://localhost%s\n", addr)

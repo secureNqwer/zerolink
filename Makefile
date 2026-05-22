@@ -13,13 +13,14 @@ CGO_LDFLAGS_WIN   := -L$(ZT_LIB) -lzerotiercore -lws2_32 -liphlpapi -lshlwapi -s
 CGO_CFLAGS_COMMON := -I$(ZT_INCLUDE)
 
 export CGO_CFLAGS := $(CGO_CFLAGS_COMMON)
+export CGO_LDFLAGS := $(CGO_LDFLAGS_LINUX)
 
 .PHONY: all client server windows test lint clean install uninstall release vendor-zt vendor-zt-win
 
 all: client server
 
 client:
-	CGO_LDFLAGS="$(CGO_LDFLAGS_LINUX)" \
+	PKG_CONFIG_PATH="$(PKG_CONFIG_PATH):/home/secure/.pkgconfig" \
 	go build -tags fts5 $(LDFLAGS) -o bin/$(APP_NAME) ./cmd/client
 
 server:
