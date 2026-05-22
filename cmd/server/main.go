@@ -44,31 +44,20 @@ func main() {
 	// ─── Print addresses ───────────────────────────────────────────────
 	port := portFromAddr(cfg.ListenAddr)
 	fmt.Println("\n─── Messenger Server ───")
-	fmt.Printf("  Port: %s\n", port)
+	fmt.Printf("  Port: %s\n\n", port)
 
-	ztNetwork := cfg.ZTNetwork
-	if ztNetwork != "" {
-		ztIP := systemZTIP(ztNetwork)
-		if ztIP != "" {
-			fmt.Printf("  Give your friend: %s\n", net.JoinHostPort(ztIP, port))
-			fmt.Println("  (via system ZeroTier – friend must be on same ZT network)")
-		} else {
-			fmt.Printf("  ZT network %s configured but no IP found.\n", ztNetwork)
-			fmt.Println("  Make sure ZeroTier is running and you're on this network.")
-			fmt.Printf("  Run: zerotier-cli join %s\n", ztNetwork)
+	// ZeroTier address
+	ztAddrs := detectSystemZTNetworks()
+	if len(ztAddrs) > 0 {
+		fmt.Println("  ZeroTier (for internet):")
+		for _, n := range ztAddrs {
+			fmt.Printf("    %s\n", net.JoinHostPort(n, port))
 		}
-	} else {
-		sysZTs := detectSystemZTNetworks()
-		if len(sysZTs) > 0 {
-			fmt.Println("  ZeroTier networks detected:")
-			for _, n := range sysZTs {
-				fmt.Printf("    %s\n", n)
-			}
-			fmt.Println("  Add 'zt_network' to server.json to use one.")
-		}
-		ifaceIP := primaryIP()
-		fmt.Printf("  LAN address: %s\n", net.JoinHostPort(ifaceIP, port))
 	}
+
+	// LAN address
+	ifaceIP := primaryIP()
+	fmt.Printf("  LAN (same Wi-Fi): %s\n", net.JoinHostPort(ifaceIP, port))
 	fmt.Println()
 
 	// ─── Graceful shutdown ─────────────────────────────────────────────
@@ -89,8 +78,8 @@ func main() {
 	}
 }
 
+// systemZTIP returns the ZT IP for a specific network ID (or the first found)
 func systemZTIP(networkID string) string {
-	// Try to match ZT network by checking routes/IPs
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return ""
@@ -142,10 +131,10 @@ func detectSystemZTNetworks() []string {
 			if ip4 == nil {
 				continue // skip IPv6
 			}
-			n := fmt.Sprintf("  %s (%s)", ip4.String(), iface.Name)
-			if !seen[n] {
-				seen[n] = true
-				nets = append(nets, n)
+			ip := ip4.String()
+			if !seen[ip] {
+				seen[ip] = true
+				nets = append(nets, ip)
 			}
 		}
 	}
