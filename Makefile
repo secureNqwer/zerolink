@@ -1,13 +1,9 @@
-# messenger-core Makefile
-#
-# Быстрый старт:
-#   make vendor-zt        – скачать и собрать libzt (Linux/macOS native)
-#   make vendor-zt-win    – собрать libzt для Windows (нужен mingw-w64)
-#   make client           – собрать CLI-клиент
-#   make server           – собрать relay-сервер
-#   make windows          – собрать Windows .exe
-#   make test             – запустить тесты
-#   make clean            – очистить артефакты
+# Zerolink Makefile
+APP_NAME   := zerolink
+VERSION    := $(shell git describe --tags --always 2>/dev/null || echo "1.0.0")
+COMMIT     := $(shell git log --format="%h" -1 2>/dev/null || echo "dev")
+BUILDTIME  := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS    := -ldflags "-X github.com/yourorg/messenger-core/version.Version=$(VERSION) -X github.com/yourorg/messenger-core/version.Commit=$(COMMIT) -X github.com/yourorg/messenger-core/version.BuildTime=$(BUILDTIME)"
 
 ZT_LIB     ?= $(CURDIR)/vendor/zerotier/lib
 ZT_INCLUDE ?= $(CURDIR)/vendor/zerotier/include
@@ -18,16 +14,16 @@ CGO_CFLAGS_COMMON := -I$(ZT_INCLUDE)
 
 export CGO_CFLAGS := $(CGO_CFLAGS_COMMON)
 
-.PHONY: all client server windows test lint clean vendor-zt vendor-zt-win
+.PHONY: all client server windows test lint clean install uninstall release vendor-zt vendor-zt-win
 
 all: client server
 
 client:
 	CGO_LDFLAGS="$(CGO_LDFLAGS_LINUX)" \
-	go build -tags fts5 -o bin/messenger-cli ./cmd/client
+	go build -tags fts5 $(LDFLAGS) -o bin/$(APP_NAME) ./cmd/client
 
 server:
-	go build -tags fts5 -o bin/messenger-server ./cmd/server
+	go build -tags fts5 $(LDFLAGS) -o bin/$(APP_NAME)-server ./cmd/server
 
 windows:
 	CGO_ENABLED=1 \
@@ -35,7 +31,24 @@ windows:
 	CC=x86_64-w64-mingw32-gcc \
 	CXX=x86_64-w64-mingw32-g++ \
 	CGO_LDFLAGS="$(CGO_LDFLAGS_WIN)" \
-	go build -tags fts5 -o bin/messenger-cli.exe ./cmd/client
+	go build -tags fts5 $(LDFLAGS) -o bin/$(APP_NAME).exe ./cmd/client
+
+# System installation
+PREFIX ?= /usr/local
+install: client
+	install -d $(DESTDIR)$(PREFIX)/bin
+	install -m 755 bin/$(APP_NAME) $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)
+	install -m 755 bin/$(APP_NAME)-server $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)-server
+	@echo "Installed to $(DESTDIR)$(PREFIX)/bin/"
+	# Desktop entry
+	install -d $(DESTDIR)$(PREFIX)/share/applications
+	sed "s|EXEC|$(PREFIX)/bin/$(APP_NAME)|g" < zerolink.desktop.in > $(DESTDIR)$(PREFIX)/share/applications/zerolink.desktop 2>/dev/null || true
+	@echo "Desktop entry created"
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)-server
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/zerolink.desktop
 
 vendor-zt:
 	@bash scripts/build_libzt.sh

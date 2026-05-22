@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"runtime"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/yourorg/messenger-core/core"
 	"github.com/yourorg/messenger-core/messenger"
+	"github.com/yourorg/messenger-core/version"
 )
 
 type authData struct {
@@ -31,10 +33,17 @@ type authData struct {
 const authFile = "auth.json"
 
 func main() {
+	guiMode  := flag.Bool("gui", false, "start web UI and open browser")
+	showVer  := flag.Bool("version", false, "show version")
 	cfgPath  := flag.String("config", "messenger.json", "path to config JSON")
 	network  := flag.String("network", "", "ZeroTier network ID to join")
 	logLevel := flag.String("log", "info", "log level (debug|info|warn|error)")
 	flag.Parse()
+
+	if *showVer {
+		fmt.Printf("%s %s (commit: %s, built: %s)\n", version.Name, version.Version, version.Commit, version.BuildTime)
+		return
+	}
 
 	cfg := core.DefaultConfig()
 	cfg.LogLevel = *logLevel
@@ -65,18 +74,14 @@ func main() {
 	fmt.Printf("  Key    : %s\n", m.LocalPeer().ID.Fingerprint)
 	fmt.Printf("  E2E    : %v\n\n", cfg.E2EEnabled)
 
-	// Subscribe to events
-	events := m.Events().Subscribe("cli",
-		core.EvtMessageReceived,
-		core.EvtPeerOnline,
-		core.EvtPeerOffline,
-		core.EvtCallIncoming,
-	)
-	go func() {
-		for evt := range events {
-			printEvent(evt)
-		}
-	}()
+	// ─── Auto-update check ────────────────────────────────────────────────
+	if runtime.GOARCH != "arm64" && runtime.GOARCH != "arm" {
+		checkUpdate()
+	}
+
+	// ─── Quit signal ───────────────────────────────────────────────────────
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// ─── Auto-login or guided setup ───────────────────────────────────────
 	auth := loadAuth()
@@ -99,12 +104,41 @@ func main() {
 		runGuidedSetup(ctx, m)
 	}
 
+	// ─── Web GUI mode ──────────────────────────────────────────────────
+	if *guiMode {
+		webui := messenger.NewWebUI(m)
+		addr := ":8081"
+		fmt.Printf("\n🌐 Web UI: http://localhost%s\n", addr)
+		fmt.Println("Press Ctrl+C to stop")
+		go webui.BroadcastLoop(m.Events())
+		srv := &http.Server{Addr: addr, Handler: webui.Handler()}
+		go func() {
+			<-quit
+			srv.Shutdown(context.Background())
+			cancel()
+		}()
+		if err := srv.ListenAndServe(); err != nil {
+			log.Info("web UI stopped")
+		}
+		return
+	}
+
+	// ─── CLI mode: events ────────────────────────────────────────────
+	events := m.Events().Subscribe("cli",
+		core.EvtMessageReceived,
+		core.EvtPeerOnline,
+		core.EvtPeerOffline,
+		core.EvtCallIncoming,
+	)
+	go func() {
+		for evt := range events {
+			printEvent(evt)
+		}
+	}()
+
 	// ─── REPL ─────────────────────────────────────────────────────────────
 	scanner := bufio.NewScanner(os.Stdin)
 	printHelp()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
 		<-quit
@@ -753,6 +787,26 @@ func isZerotierIP(addr string) bool {
 		}
 	}
 	return false
+}
+
+func checkUpdate() {
+	resp, err := http.Get("https://api.github.com/repos/secureNqwer/messenger-core/releases/latest")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	var rel struct {
+		TagName string `json:"tag_name"`
+		Body    string `json:"body"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+		return
+	}
+	if rel.TagName > version.Version && rel.TagName != "" {
+		fmt.Printf("\nUpdate available: %s → %s\n", version.Version, rel.TagName)
+		fmt.Printf("  %s\n", rel.Body)
+		fmt.Printf("  Download: https://github.com/secureNqwer/messenger-core/releases/tag/%s\n", rel.TagName)
+	}
 }
 
 func isValidUsername(s string) bool {

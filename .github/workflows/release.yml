@@ -1,0 +1,64 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - name: linux-amd64
+            os: linux
+            arch: amd64
+            cgo: true
+          - name: windows-amd64
+            os: windows
+            arch: amd64
+            cgo: true
+          - name: linux-arm64
+            os: linux
+            arch: arm64
+            cgo: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.22" }
+
+      - name: Install mingw (Windows)
+        if: matrix.target.os == 'windows'
+        run: sudo apt-get install -y mingw-w64 cmake
+
+      - name: Build libzt (Linux)
+        if: matrix.target.cgo == true && matrix.target.os == 'linux'
+        run: bash scripts/build_libzt.sh
+
+      - name: Build libzt (Windows)
+        if: matrix.target.cgo == true && matrix.target.os == 'windows'
+        run: bash scripts/build_libzt.sh --windows
+
+      - name: Build
+        env:
+          CGO_ENABLED: ${{ matrix.target.cgo && '1' || '0' }}
+          GOOS: ${{ matrix.target.os }}
+          GOARCH: ${{ matrix.target.arch }}
+          CC: ${{ matrix.target.os == 'windows' && 'x86_64-w64-mingw32-gcc' || '' }}
+          CXX: ${{ matrix.target.os == 'windows' && 'x86_64-w64-mingw32-g++' || '' }}
+        run: |
+          make client
+          make server
+          if [ "${{ matrix.target.os }}" = "windows" ]; then
+            mv bin/*.exe .
+          else
+            mv bin/* .
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerolink-${{ matrix.target.name }}
+          path: |
+            zerolink*
+            !*.db
