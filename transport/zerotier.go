@@ -14,6 +14,7 @@ package transport
 /*
 #cgo CFLAGS:  -I${SRCDIR}/../vendor/zerotier/include -DZTS_STATIC
 #cgo LDFLAGS: -L${SRCDIR}/../vendor/zerotier/lib -lzerotiercore -lstdc++ -lm
+#cgo windows LDFLAGS: -lws2_32 -liphlpapi -lshlwapi -static -static-libgcc -static-libstdc++
 
 #include "ZeroTierSockets.h"
 #include <stdlib.h>
