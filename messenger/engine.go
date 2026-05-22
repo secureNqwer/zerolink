@@ -18,11 +18,11 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/yourorg/messenger-core/core"
-	"github.com/yourorg/messenger-core/crypto"
-	"github.com/yourorg/messenger-core/media"
-	"github.com/yourorg/messenger-core/storage"
-	"github.com/yourorg/messenger-core/transport"
+	"github.com/secureNqwer/zerolink/core"
+	"github.com/secureNqwer/zerolink/crypto"
+	"github.com/secureNqwer/zerolink/media"
+	"github.com/secureNqwer/zerolink/storage"
+	"github.com/secureNqwer/zerolink/transport"
 )
 
 // ─── Engine ───────────────────────────────────────────────────────────────────

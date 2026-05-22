@@ -20,9 +20,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/yourorg/messenger-core/core"
-	"github.com/yourorg/messenger-core/messenger"
-	"github.com/yourorg/messenger-core/version"
+	"github.com/secureNqwer/zerolink/core"
+	"github.com/secureNqwer/zerolink/messenger"
+	"github.com/secureNqwer/zerolink/version"
 )
 
 type authData struct {
@@ -883,7 +883,7 @@ func runCmd(name string, args ...string) error {
 }
 
 func checkUpdate() {
-	resp, err := http.Get("https://api.github.com/repos/secureNqwer/messenger-core/releases/latest")
+	resp, err := http.Get("https://api.github.com/repos/secureNqwer/zerolink/releases/latest")
 	if err != nil {
 		return
 	}
@@ -898,7 +898,7 @@ func checkUpdate() {
 	if rel.TagName > version.Version && rel.TagName != "" {
 		fmt.Printf("\nUpdate available: %s → %s\n", version.Version, rel.TagName)
 		fmt.Printf("  %s\n", rel.Body)
-		fmt.Printf("  Download: https://github.com/secureNqwer/messenger-core/releases/tag/%s\n", rel.TagName)
+		fmt.Printf("  Download: https://github.com/secureNqwer/zerolink/releases/tag/%s\n", rel.TagName)
 	}
 }
 

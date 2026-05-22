@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="https://github.com/secureNqwer/messenger-core.git"
+REPO="https://github.com/secureNqwer/zerolink.git"
 DIR="${DIR:-$HOME/zerolink}"
 PREFIX="${PREFIX:-/usr/local}"
 

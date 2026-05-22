@@ -43,7 +43,7 @@ if exist "%DIR%\.git" (
     git pull --ff-only
 ) else (
     echo [INFO] Cloning repository...
-    git clone https://github.com/secureNqwer/messenger-core.git "%DIR%"
+    git clone https://github.com/secureNqwer/zerolink.git "%DIR%"
     cd /d "%DIR%"
 )
 

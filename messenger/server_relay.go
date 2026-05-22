@@ -18,7 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/messenger-core/core"
+	"github.com/secureNqwer/zerolink/core"
 )
 
 // Re-export core types for convenience.

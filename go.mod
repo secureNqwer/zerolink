@@ -1,4 +1,4 @@
-module github.com/yourorg/messenger-core
+module github.com/secureNqwer/zerolink
 
 go 1.22
 

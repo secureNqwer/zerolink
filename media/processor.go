@@ -28,7 +28,7 @@ import (
 	"github.com/nfnt/resize"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/messenger-core/core"
+	"github.com/secureNqwer/zerolink/core"
 )
 
 // ImageOptions controls image processing.

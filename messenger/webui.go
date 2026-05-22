@@ -15,8 +15,8 @@ import (
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/messenger-core/core"
-	"github.com/yourorg/messenger-core/version"
+	"github.com/secureNqwer/zerolink/core"
+	"github.com/secureNqwer/zerolink/version"
 )
 
 var upgrader = websocket.Upgrader{

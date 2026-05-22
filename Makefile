@@ -3,7 +3,7 @@ APP_NAME   := zerolink
 VERSION    := $(shell git describe --tags --always 2>/dev/null || echo "1.0.0")
 COMMIT     := $(shell git log --format="%h" -1 2>/dev/null || echo "dev")
 BUILDTIME  := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS    := -ldflags "-X github.com/yourorg/messenger-core/version.Version=$(VERSION) -X github.com/yourorg/messenger-core/version.Commit=$(COMMIT) -X github.com/yourorg/messenger-core/version.BuildTime=$(BUILDTIME)"
+LDFLAGS    := -ldflags "-X github.com/secureNqwer/zerolink/version.Version=$(VERSION) -X github.com/secureNqwer/zerolink/version.Commit=$(COMMIT) -X github.com/secureNqwer/zerolink/version.BuildTime=$(BUILDTIME)"
 
 ZT_LIB     ?= $(CURDIR)/vendor/zerotier/lib
 ZT_INCLUDE ?= $(CURDIR)/vendor/zerotier/include

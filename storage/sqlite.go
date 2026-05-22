@@ -13,7 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 
-	"github.com/yourorg/messenger-core/core"
+	"github.com/secureNqwer/zerolink/core"
 )
 
 // SQLiteStorage implements core.Storage.

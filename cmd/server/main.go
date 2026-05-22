@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourorg/messenger-core/server"
+	"github.com/secureNqwer/zerolink/server"
 )
 
 func main() {

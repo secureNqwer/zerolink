@@ -32,7 +32,7 @@ import (
 	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/hkdf"
 
-	"github.com/yourorg/messenger-core/core"
+	"github.com/secureNqwer/zerolink/core"
 )
 
 // ─── Identity ────────────────────────────────────────────────────────────────

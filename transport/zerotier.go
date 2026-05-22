@@ -42,7 +42,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/yourorg/messenger-core/core"
+	"github.com/secureNqwer/zerolink/core"
 )
 
 const (

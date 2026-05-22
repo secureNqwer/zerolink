@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yourorg/messenger-core/core"
+	"github.com/secureNqwer/zerolink/core"
 )
 
 // ZTTransport is a stub for platforms without CGO/libzt.
