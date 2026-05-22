@@ -40,6 +40,8 @@ const (
 	CmdLogin         = core.CmdLogin
 	CmdListPeers     = core.CmdListPeers
 	CmdUpdateProfile = core.CmdUpdateProfile
+	CmdHandshake     = core.CmdHandshake
+	CmdHandshakeAck  = core.CmdHandshakeAck
 )
 
 // serverRelay manages the WebSocket connection to the optional relay server.
@@ -201,6 +203,21 @@ func (r *serverRelay) Connected() bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return r.connected
+}
+
+// RelayHandshake forwards a handshake payload through the server.
+func (r *serverRelay) RelayHandshake(ctx context.Context, hp HandshakePayload, to string) {
+	payload, _ := json.Marshal(hp)
+	frame := &RelayFrame{
+		Cmd:       CmdHandshake,
+		PeerID:    to,
+		Payload:   payload,
+		Timestamp: time.Now().UnixNano(),
+	}
+	select {
+	case r.sendCh <- frame:
+	default:
+	}
 }
 
 // Relay forwards a message through the server.

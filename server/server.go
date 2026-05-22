@@ -313,6 +313,8 @@ func (s *Server) handleFrame(c *client, frame *core.RelayFrame) {
 		s.handleListPeers(c, frame)
 	case core.CmdUpdateProfile:
 		s.handleUpdateProfile(c, frame)
+	case core.CmdHandshake, core.CmdHandshakeAck:
+		s.handleHandshakeRelay(c, frame)
 	case core.CmdPing:
 		c.send(&core.RelayFrame{Cmd: core.CmdPong, Timestamp: time.Now().UnixNano()})
 	default:
@@ -532,6 +534,23 @@ func (s *Server) handleListPeers(c *client, frame *core.RelayFrame) {
 		Cmd:       core.CmdListPeers,
 		Payload:   payload,
 		Timestamp: time.Now().UnixNano(),
+	})
+}
+
+// handleHandshakeRelay forwards a handshake frame to the target peer.
+func (s *Server) handleHandshakeRelay(c *client, frame *core.RelayFrame) {
+	to := core.NodeID(frame.PeerID)
+	if to == "" {
+		return
+	}
+	// Forward to all connected clients with that node ID
+	s.clients.Range(func(_, v interface{}) bool {
+		for _, cl := range v.([]*client) {
+			if cl.peerID.NodeID == to && cl.id != c.id {
+				cl.send(frame)
+			}
+		}
+		return true
 	})
 }
 

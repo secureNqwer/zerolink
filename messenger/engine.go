@@ -1314,11 +1314,20 @@ func (e *Engine) SendHandshake(ctx context.Context, to core.NodeID) error {
 		Signature: sig, Timestamp: time.Now().UnixNano(),
 	}
 	body, _ := json.Marshal(hp)
-	return e.trans.Send(ctx, to, &core.Packet{
+	// Send via P2P transport
+	p2pErr := e.trans.Send(ctx, to, &core.Packet{
 		Magic: core.PacketMagic, Version: core.PacketVersion,
 		Type: core.MsgHandshake, TTL: 64,
 		Timestamp: time.Now().UnixNano(), Body: body,
 	})
+	// Also relay through server if connected (for server-only mode)
+	e.mu.RLock()
+	sc := e.serverConn
+	e.mu.RUnlock()
+	if sc != nil && sc.Connected() {
+		sc.RelayHandshake(ctx, hp, string(to))
+	}
+	return p2pErr
 }
 
 func (e *Engine) handleHandshake(ctx context.Context, ipkt *core.IncomingPacket) {
@@ -1556,6 +1565,26 @@ func (e *Engine) handleCallSignalPacket(ctx context.Context, ipkt *core.Incoming
 }
 
 func (e *Engine) handleRelayFrame(frame *RelayFrame) {
+	// Handle handshake frames relayed via server
+	if frame.Cmd == CmdHandshake || frame.Cmd == CmdHandshakeAck {
+		var hp HandshakePayload
+		if err := json.Unmarshal(frame.Payload, &hp); err != nil {
+			return
+		}
+		e.handleIncoming(context.Background(), &core.IncomingPacket{
+			From:       hp.PeerID.NodeID,
+			ReceivedAt: time.Now(),
+			Pkt: &core.Packet{
+				Magic: core.PacketMagic, Version: core.PacketVersion,
+				Type:     core.MsgHandshake,
+				Flags:    0,
+				Body:     frame.Payload,
+				Timestamp: frame.Timestamp,
+			},
+		})
+		return
+	}
+
 	if frame.Cmd != CmdRelay && frame.Cmd != CmdSyncResp {
 		return
 	}

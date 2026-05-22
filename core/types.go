@@ -644,6 +644,8 @@ const (
 	CmdLogin         RelayCommand = "login"
 	CmdListPeers     RelayCommand = "list_peers"
 	CmdUpdateProfile RelayCommand = "update_profile"
+	CmdHandshake     RelayCommand = "handshake"
+	CmdHandshakeAck  RelayCommand = "handshake_ack"
 )
 
 type RelayFrame struct {
