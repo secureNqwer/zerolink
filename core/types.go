@@ -743,6 +743,7 @@ func DefaultConfig() *Config {
 		PingInterval:       30 * time.Second,
 		LogLevel:           "info",
 		TransportMode:      TransportBoth,
+		IdentityFile:       "identity.json",
 	}
 }
 
