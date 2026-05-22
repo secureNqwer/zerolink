@@ -1,0 +1,13 @@
+bin/
+build_libzt_tmp/
+zt/
+zt-server/
+media/
+server-media/
+*.db
+*.db-shm
+*.db-wal
+*.exe
+messenger.json
+auth.json
+identity.json

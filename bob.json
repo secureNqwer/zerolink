@@ -1,0 +1,14 @@
+{
+  "zt_port": 9994,
+  "zt_data_dir": "./zt_bob",
+  "networks": [],
+  "identity_file": "./identity_bob.json",
+  "db_path": "./messenger_bob.db",
+  "media_dir": "./media_bob",
+  "listen_port": 7778,
+  "log_level": "info",
+  "require_contact_accept": false,
+  "use_server": true,
+  "server_addresses": ["127.0.0.1:8080"],
+  "e2e_enabled": false
+}

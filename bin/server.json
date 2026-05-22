@@ -1,0 +1,5 @@
+{
+  "listen_addr": ":8080",
+  "zt_network": "633e31d8a2dad25c",
+  "token_secret": "какой-нибудь-секрет"
+}

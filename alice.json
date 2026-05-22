@@ -1,0 +1,14 @@
+{
+  "zt_port": 9993,
+  "zt_data_dir": "./zt_alice",
+  "networks": [],
+  "identity_file": "./identity_alice.json",
+  "db_path": "./messenger_alice.db",
+  "media_dir": "./media_alice",
+  "listen_port": 7777,
+  "log_level": "info",
+  "require_contact_accept": false,
+  "use_server": true,
+  "server_addresses": ["127.0.0.1:8080"],
+  "e2e_enabled": false
+}
