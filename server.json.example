@@ -1,0 +1,5 @@
+{
+  "listen_addr": ":8080",
+  "zt_network": "YOUR_ZEROTIER_NETWORK_ID",
+  "token_secret": "change-this-to-something-secret"
+}
