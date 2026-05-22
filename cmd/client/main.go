@@ -10,9 +10,10 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"runtime"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -808,29 +809,25 @@ func doInstall() {
 	}
 	dst := "/usr/local/bin/zerolink"
 	fmt.Printf("Installing to %s ...\n", dst)
-	if err := copyFile(exe, dst); err != nil {
+	// Use cp via shell since binary can't overwrite itself while running
+	if err := runCmd("cp", exe, dst); err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 	fmt.Println("✓ Installed to /usr/local/bin/zerolink")
-	fmt.Println("  Run 'zerolink' to start CLI")
-	fmt.Println("  Run 'zerolink -gui' for web UI")
+	fmt.Println("  Now you can run: zerolink, zerolink -gui, zerolink -version")
 }
 
 func doUninstall() {
-	paths := []string{"/usr/local/bin/zerolink", "/usr/local/bin/zerolink-server"}
-	for _, p := range paths {
-		os.Remove(p)
-	}
+	runCmd("rm", "-f", "/usr/local/bin/zerolink", "/usr/local/bin/zerolink-server")
 	fmt.Println("✓ Zerolink removed from system")
 }
 
-func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(dst, data, 0755)
+func runCmd(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func checkUpdate() {
