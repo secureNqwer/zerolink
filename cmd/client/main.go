@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -136,8 +137,10 @@ func runGuidedSetup(ctx context.Context, m *messenger.Engine) {
 	fmt.Println("─── Messenger Setup ───")
 	fmt.Println("Connect to a server to find other users.")
 	fmt.Println("Press Enter to skip and use offline mode.")
-
-	fmt.Print("Server address (e.g. 192.168.1.100:8080): ")
+	fmt.Println()
+	fmt.Println("If using ZeroTier, first join the same network:")
+	fmt.Println("  /join <your_network_id>")
+	fmt.Println()
 	addr, _ := reader.ReadString('\n')
 	addr = strings.TrimSpace(addr)
 	if addr == "" {
@@ -314,6 +317,9 @@ func handleCommand(ctx context.Context, m *messenger.Engine, line string, log *z
 		if len(args) == 0 {
 			fmt.Println("usage: /join_server <addr>")
 			fmt.Println("  e.g. /join_server 192.168.1.100:8080")
+			fmt.Println("  e.g. /join_server 10.145.95.213:8080")
+			fmt.Println("\nIf the server is on another network, you need to be on the same")
+			fmt.Println("ZeroTier network. Join it first with: /join <networkID>")
 			return
 		}
 		addr := args[0]
@@ -322,7 +328,6 @@ func handleCommand(ctx context.Context, m *messenger.Engine, line string, log *z
 		}
 		fmt.Printf("Connecting to %s ...\n", addr)
 
-		// Check if we have saved auth for this server
 		auth := loadAuth()
 		var err error
 		if auth != nil && auth.ServerAddr == addr && auth.Token != "" {
@@ -332,6 +337,13 @@ func handleCommand(ctx context.Context, m *messenger.Engine, line string, log *z
 		}
 		if err != nil {
 			fmt.Println("error:", err)
+			// Check if IP looks like a ZeroTier address (10.x.x.x)
+			if isZerotierIP(addr) {
+				fmt.Println("\nThis looks like a ZeroTier IP.")
+				fmt.Println("Make sure you're on the same ZeroTier network:")
+				fmt.Println("  /join <your_network_id>")
+				fmt.Println("Then try /join_server again.")
+			}
 			return
 		}
 		fmt.Println("connected to server")
@@ -722,6 +734,25 @@ func httpPostJSON(url string, data map[string]string) (map[string]string, error)
 		}
 	}
 	return strResult, nil
+}
+
+func isZerotierIP(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	if ip4 := ip.To4(); ip4 != nil {
+		// ZeroTier uses 10.x.x.x and 192.168.x.x (but those can also be LAN)
+		// 10.x.x.x with 10.145.x.x is common ZeroTier range
+		if ip4[0] == 10 {
+			return true
+		}
+	}
+	return false
 }
 
 func isValidUsername(s string) bool {
