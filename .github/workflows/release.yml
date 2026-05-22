@@ -55,8 +55,9 @@ jobs:
           make client
           make server
           mkdir -p dist
-          cp bin/zerolink${{ matrix.ext }} dist/zerolink-${{ matrix.name }}${{ matrix.ext }}
-          cp bin/zerolink-server${{ matrix.ext }} dist/zerolink-server-${{ matrix.name }}${{ matrix.ext }}
+          # Copy and rename: Go build doesn't add .exe even on Windows
+          cp bin/zerolink dist/zerolink-${{ matrix.name }}${{ matrix.ext }}
+          cp bin/zerolink-server dist/zerolink-server-${{ matrix.name }}${{ matrix.ext }}
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
