@@ -188,20 +188,26 @@ func cliLoop(ctx context.Context, m *messenger.Engine, log *zap.Logger, quit cha
 }
 
 func openURL(url string) {
-	var cmd string
-	var args []string
+	// Try Chrome/Chromium in app mode (window without browser chrome)
+	for _, name := range []string{"chromium", "google-chrome", "google-chrome-stable", "brave-browser", "firefox"} {
+		if p, _ := exec.LookPath(name); p != "" {
+			if name == "firefox" {
+				exec.Command(p, "--new-window", url).Start()
+			} else {
+				exec.Command(p, "--app="+url).Start()
+			}
+			return
+		}
+	}
+	// Fallback: system default
 	switch runtime.GOOS {
 	case "windows":
-		cmd = "rundll32"
-		args = []string{"url.dll,FileProtocolHandler", url}
+		exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 	case "darwin":
-		cmd = "open"
-		args = []string{url}
+		exec.Command("open", url).Start()
 	default:
-		cmd = "xdg-open"
-		args = []string{url}
+		exec.Command("xdg-open", url).Start()
 	}
-	exec.Command(cmd, args...).Start()
 }
 
 func runGuidedSetup(ctx context.Context, m *messenger.Engine) {
