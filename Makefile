@@ -37,18 +37,21 @@ windows:
 PREFIX ?= /usr/local
 install: client
 	install -d $(DESTDIR)$(PREFIX)/bin
+	install -d $(DESTDIR)$(PREFIX)/share/icons/hicolor/256x256/apps
 	install -m 755 bin/$(APP_NAME) $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)
 	install -m 755 bin/$(APP_NAME)-server $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)-server
+	install -m 644 icons/$(APP_NAME).png $(DESTDIR)$(PREFIX)/share/icons/hicolor/256x256/apps/$(APP_NAME).png
 	@echo "Installed to $(DESTDIR)$(PREFIX)/bin/"
 	# Desktop entry
 	install -d $(DESTDIR)$(PREFIX)/share/applications
-	sed "s|EXEC|$(PREFIX)/bin/$(APP_NAME)|g" < zerolink.desktop.in > $(DESTDIR)$(PREFIX)/share/applications/zerolink.desktop 2>/dev/null || true
+	sed "s|EXEC|$(PREFIX)/bin/$(APP_NAME)|g; s|ICON|$(APP_NAME)|g" < zerolink.desktop.in > $(DESTDIR)$(PREFIX)/share/applications/zerolink.desktop 2>/dev/null || true
 	@echo "Desktop entry created"
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)-server
 	rm -f $(DESTDIR)$(PREFIX)/share/applications/zerolink.desktop
+	rm -f $(DESTDIR)$(PREFIX)/share/icons/hicolor/256x256/apps/$(APP_NAME).png
 
 vendor-zt:
 	@bash scripts/build_libzt.sh

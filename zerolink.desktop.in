@@ -2,7 +2,7 @@
 Name=Zerolink
 Comment=Secure P2P Messenger
 Exec=EXEC -gui
-Icon=zerolink
+Icon=ICON
 Terminal=false
 Type=Application
 Categories=Network;Chat;InstantMessaging;
