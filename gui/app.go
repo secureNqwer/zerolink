@@ -1,3 +1,5 @@
+//go:build linux
+
 package gui
 
 import (
@@ -22,7 +24,11 @@ func Run(engine *messenger.Engine, _ interface{}) {
 
 	w := webview.New(true)
 	defer w.Destroy()
-	w.SetTitle(version.Name + " - " + engine.ServerRelay().Username())
+	title := version.Name
+	if sr := engine.ServerRelay(); sr != nil && sr.Connected() {
+		title = version.Name + " - " + sr.Username()
+	}
+	w.SetTitle(title)
 	w.SetSize(1000, 650, webview.HintNone)
 	w.Navigate("http://localhost" + addr)
 	w.Run()
