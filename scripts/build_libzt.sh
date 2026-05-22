@@ -195,9 +195,29 @@ mkdir -p "$VENDOR_LIB" "$VENDOR_INC"
 LIBNAME=$(basename "$LIB_FILE")
 cp "$LIB_FILE" "$VENDOR_LIB/$LIBNAME"
 
-# Симлинк libzerotiercore.a → реальная либа (CGO ищет -lzerotiercore)
-if [[ "$LIBNAME" != "libzerotiercore.a" ]]; then
-  ln -sf "$LIBNAME" "$VENDOR_LIB/libzerotiercore.a"
+# На Termux/Android библиотека может быть разделена на libzt_pic.a + libzto_pic.a
+# Объединяем их в одну libzerotiercore.a
+if [[ "$LIBNAME" == "libzt_pic.a" ]]; then
+  ZTO_LIB=$(find "$CMAKE_BUILD" -name "libzto_pic.a" 2>/dev/null | head -1)
+  if [[ -n "$ZTO_LIB" ]]; then
+    echo "==> Объединение libzt_pic.a + libzto_pic.a → libzerotiercore.a"
+    cp "$LIB_FILE" "$VENDOR_LIB/libzerotiercore.a"
+    # Извлекаем объекты из второй библиотеки и добавляем их
+    TMPDIR=$(mktemp -d)
+    cd "$TMPDIR"
+    ar x "$ZTO_LIB"
+    ar r "$VENDOR_LIB/libzerotiercore.a" *.o 2>/dev/null
+    cd /
+    rm -rf "$TMPDIR"
+    echo "==> Готово: libzerotiercore.a объединена"
+  else
+    ln -sf "$LIBNAME" "$VENDOR_LIB/libzerotiercore.a"
+  fi
+else
+  # Симлинк libzerotiercore.a → реальная либа
+  if [[ "$LIBNAME" != "libzerotiercore.a" ]]; then
+    ln -sf "$LIBNAME" "$VENDOR_LIB/libzerotiercore.a"
+  fi
 fi
 
 cp "$HEADER" "$VENDOR_INC/ZeroTierSockets.h"
