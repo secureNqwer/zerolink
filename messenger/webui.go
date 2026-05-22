@@ -98,6 +98,7 @@ func (w *WebUI) Handler() http.Handler {
 	mux.HandleFunc("/api/settings", w.handleSettings)
 	mux.HandleFunc("/api/dm", w.handleDM)
 	mux.HandleFunc("/api/profile", w.handleProfile)
+	mux.HandleFunc("/api/upload", w.handleUpload)
 	mux.HandleFunc("/api/shutdown", w.handleShutdown)
 	mux.HandleFunc("/ws", w.handleWS)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./webui"))))
@@ -420,6 +421,23 @@ func (w *WebUI) handleDM(rw http.ResponseWriter, r *http.Request) {
 	}
 	json.NewDecoder(r.Body).Decode(&req)
 	peer := core.PeerID{NodeID: core.NodeID(req.NodeID), Fingerprint: req.Fingerprint}
+
+	// Find existing DM with this peer
+	chats, _ := w.engine.ListChats()
+	for _, c := range chats {
+		if c.Type != core.ChatDirect {
+			continue
+		}
+		for _, m := range c.Members {
+			if m.PeerID.String() == peer.String() {
+				// Existing chat found
+				json.NewEncoder(rw).Encode(map[string]interface{}{"ok": true, "chat_id": c.ID, "existing": true})
+				return
+			}
+		}
+	}
+
+	// Create new chat
 	chat, err := w.engine.CreateChat("", []core.PeerID{peer})
 	if err != nil {
 		json.NewEncoder(rw).Encode(map[string]string{"error": err.Error()})
@@ -427,6 +445,50 @@ func (w *WebUI) handleDM(rw http.ResponseWriter, r *http.Request) {
 	}
 	w.engine.SendHandshake(context.Background(), peer.NodeID)
 	json.NewEncoder(rw).Encode(map[string]interface{}{"ok": true, "chat_id": chat.ID})
+}
+
+func (w *WebUI) handleUpload(rw http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(rw, "POST required", 405)
+		return
+	}
+	r.ParseMultipartForm(50 << 20) // 50MB max
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(map[string]string{"error": "No file provided"})
+		return
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(map[string]string{"error": "Failed to read file"})
+		return
+	}
+
+	chatID := core.ChatID(r.FormValue("chat_id"))
+	if chatID == "" {
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(map[string]string{"error": "chat_id required"})
+		return
+	}
+
+	fileName := r.FormValue("name")
+	if fileName == "" {
+		fileName = "file"
+	}
+
+	msg, err := w.engine.SendFile(context.Background(), chatID, fileName, data)
+	if err != nil {
+		rw.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(rw).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	rw.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(rw).Encode(map[string]interface{}{"ok": true, "msg_id": string(msg.ID)})
 }
 
 func (w *WebUI) handleShutdown(rw http.ResponseWriter, r *http.Request) {
