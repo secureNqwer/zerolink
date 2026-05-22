@@ -32,10 +32,11 @@ type WebUIClient struct {
 }
 
 type WebUI struct {
-	engine *Engine
-	log    *zap.Logger
-	mu     sync.RWMutex
-	clients map[string]*WebUIClient
+	engine   *Engine
+	log      *zap.Logger
+	mu       sync.RWMutex
+	clients  map[string]*WebUIClient
+	onShutdown func()
 }
 
 func NewWebUI(engine *Engine) *WebUI {
@@ -45,6 +46,8 @@ func NewWebUI(engine *Engine) *WebUI {
 		clients: make(map[string]*WebUIClient),
 	}
 }
+
+func (w *WebUI) SetShutdownHandler(fn func()) { w.onShutdown = fn }
 
 func (w *WebUI) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -58,6 +61,7 @@ func (w *WebUI) Handler() http.Handler {
 	mux.HandleFunc("/api/settings", w.handleSettings)
 	mux.HandleFunc("/api/dm", w.handleDM)
 	mux.HandleFunc("/api/profile", w.handleProfile)
+	mux.HandleFunc("/api/shutdown", w.handleShutdown)
 	mux.HandleFunc("/ws", w.handleWS)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./webui"))))
 	return mux
@@ -206,6 +210,13 @@ func (w *WebUI) handleDM(rw http.ResponseWriter, r *http.Request) {
 	}
 	w.engine.SendHandshake(context.Background(), peer.NodeID)
 	json.NewEncoder(rw).Encode(map[string]interface{}{"ok": true, "chat_id": chat.ID})
+}
+
+func (w *WebUI) handleShutdown(rw http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(rw).Encode(map[string]string{"ok": "true"})
+	if w.onShutdown != nil {
+		go w.onShutdown()
+	}
 }
 
 func (w *WebUI) handleProfile(rw http.ResponseWriter, r *http.Request) {
@@ -381,7 +392,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   <div id="sidebar">
     <div id="sidebar-header">
       <div><h2>` + version.Name + `</h2><span class="status" id="connection-status">disconnected</span></div>
-      <button style="background:none;border:none;color:#888;cursor:pointer;font-size:20px;" id="settings-btn">&#9881;</button>
+      <div>
+        <button style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;" id="settings-btn" title="Settings">&#9881;</button>
+        <button style="background:none;border:none;color:#e74c3c;cursor:pointer;font-size:16px;" id="quit-btn" title="Quit">&#10005;</button>
+      </div>
     </div>
     <div id="chat-list"></div>
   </div>
@@ -494,6 +508,12 @@ document.getElementById('transport-select').onchange = async e => {
 };
 document.getElementById('peers-toggle').onclick = () => { document.getElementById('peers-panel').classList.toggle('hidden'); };
 document.getElementById('settings-btn').onclick = () => { document.getElementById('peers-panel').classList.toggle('hidden'); };
+document.getElementById('quit-btn').onclick = async () => {
+  if (confirm('Shutdown Zerolink?')) {
+    await fetch('/api/shutdown', {method:'POST'});
+    setTimeout(() => { document.body.innerHTML = '<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-size:24px;color:#888;">Zerolink stopped</div>'; }, 500);
+  }
+};
 function htmlEscape(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 </script>
 </body>

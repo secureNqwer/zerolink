@@ -126,9 +126,14 @@ func main() {
 	webui := messenger.NewWebUI(m)
 	addr := ":8081"
 	fmt.Printf("\n  Web UI: http://localhost%s\n", addr)
-	fmt.Println("  Press Ctrl+C to stop")
+	fmt.Println("  Press Ctrl+C or use the Shutdown button in the UI")
 	go webui.BroadcastLoop(m.Events())
 	srv := &http.Server{Addr: addr, Handler: webui.Handler()}
+	webui.SetShutdownHandler(func() {
+		srv.Shutdown(context.Background())
+		cancel()
+		os.Exit(0)
+	})
 	go func() {
 		<-quit
 		srv.Shutdown(context.Background())
