@@ -135,10 +135,21 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 	}
 
 	// Open UDP socket (ZeroTier virtual networking)
-	addr := &net.UDPAddr{Port: int(t.cfg.ListenPort)}
+	port := int(t.cfg.ListenPort)
+	addr := &net.UDPAddr{Port: port}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		return fmt.Errorf("transport: failed to listen UDP: %w", err)
+		// Try random port as fallback (avoids "address already in use" from stale processes)
+		addr2 := &net.UDPAddr{Port: 0}
+		conn2, err2 := net.ListenUDP("udp", addr2)
+		if err2 != nil {
+			return fmt.Errorf("transport: failed to listen UDP on any port: %w", err2)
+		}
+		conn = conn2
+		t.log.Warn("configured port busy, using random port",
+			zap.Int("configured", port),
+			zap.Int("actual", conn.LocalAddr().(*net.UDPAddr).Port),
+		)
 	}
 	t.conn = conn
 	t.started = true
