@@ -3,62 +3,65 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
+        include:
           - name: linux-amd64
             os: linux
             arch: amd64
+            ext: ""
             cgo: true
           - name: windows-amd64
             os: windows
             arch: amd64
+            ext: ".exe"
             cgo: true
           - name: linux-arm64
             os: linux
             arch: arm64
+            ext: ""
             cgo: false
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-go@v5
         with: { go-version: "1.22" }
 
-      - name: Install mingw (Windows)
-        if: matrix.target.os == 'windows'
+      - name: Install mingw
+        if: matrix.os == 'windows'
         run: sudo apt-get install -y mingw-w64 cmake
 
       - name: Build libzt (Linux)
-        if: matrix.target.cgo == true && matrix.target.os == 'linux'
+        if: matrix.cgo && matrix.os == 'linux'
         run: bash scripts/build_libzt.sh
 
       - name: Build libzt (Windows)
-        if: matrix.target.cgo == true && matrix.target.os == 'windows'
+        if: matrix.cgo && matrix.os == 'windows'
         run: bash scripts/build_libzt.sh --windows
 
       - name: Build
         env:
-          CGO_ENABLED: ${{ matrix.target.cgo && '1' || '0' }}
-          GOOS: ${{ matrix.target.os }}
-          GOARCH: ${{ matrix.target.arch }}
-          CC: ${{ matrix.target.os == 'windows' && 'x86_64-w64-mingw32-gcc' || '' }}
-          CXX: ${{ matrix.target.os == 'windows' && 'x86_64-w64-mingw32-g++' || '' }}
+          CGO_ENABLED: ${{ matrix.cgo && '1' || '0' }}
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CC: ${{ matrix.os == 'windows' && 'x86_64-w64-mingw32-gcc' || '' }}
+          CXX: ${{ matrix.os == 'windows' && 'x86_64-w64-mingw32-g++' || '' }}
         run: |
           make client
           make server
-          if [ "${{ matrix.target.os }}" = "windows" ]; then
-            mv bin/*.exe .
-          else
-            mv bin/* .
-          fi
+          mkdir -p dist
+          cp bin/zerolink${{ matrix.ext }} dist/zerolink-${{ matrix.name }}${{ matrix.ext }}
+          cp bin/zerolink-server${{ matrix.ext }} dist/zerolink-server-${{ matrix.name }}${{ matrix.ext }}
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         with:
-          name: zerolink-${{ matrix.target.name }}
-          path: |
-            zerolink*
-            !*.db
+          files: dist/*
+          generate_release_notes: true
+          make_latest: true
