@@ -1,13 +1,31 @@
+# Binaries
 bin/
+*.exe
+messenger-cli
+messenger-server
+
+# Build temp
 build_libzt_tmp/
+
+# ZeroTier data
 zt/
 zt-server/
+
+# Media cache
 media/
 server-media/
+
+# Databases
 *.db
 *.db-shm
 *.db-wal
-*.exe
+
+# Config & auth
 messenger.json
+server.json
 auth.json
 identity.json
+
+# OS
+.DS_Store
+Thumbs.db
