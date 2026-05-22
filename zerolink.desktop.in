@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Zerolink
 Comment=Secure P2P Messenger
-Exec=EXEC -gui
+Exec=EXEC
 Icon=ICON
 Terminal=false
 Type=Application

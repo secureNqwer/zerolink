@@ -34,7 +34,7 @@ type authData struct {
 const authFile = "auth.json"
 
 func main() {
-	guiMode     := flag.Bool("gui", false, "start web UI and open browser")
+	cliMode     := flag.Bool("cli", false, "start CLI mode (default is web UI)")
 	showVer     := flag.Bool("version", false, "show version")
 	installMode := flag.Bool("install", false, "install Zerolink system-wide")
 	uninstallMode := flag.Bool("uninstall", false, "remove Zerolink from system")
@@ -116,26 +116,32 @@ func main() {
 		runGuidedSetup(ctx, m)
 	}
 
-	// ─── Web GUI mode ──────────────────────────────────────────────────
-	if *guiMode {
-		webui := messenger.NewWebUI(m)
-		addr := ":8081"
-		fmt.Printf("\n🌐 Web UI: http://localhost%s\n", addr)
-		fmt.Println("Press Ctrl+C to stop")
-		go webui.BroadcastLoop(m.Events())
-		srv := &http.Server{Addr: addr, Handler: webui.Handler()}
-		go func() {
-			<-quit
-			srv.Shutdown(context.Background())
-			cancel()
-		}()
-		if err := srv.ListenAndServe(); err != nil {
-			log.Info("web UI stopped")
-		}
+	// ─── Mode selection: CLI (-cli) or GUI (default) ────────────────
+	if *cliMode {
+		cliLoop(ctx, m, log, quit, cancel)
 		return
 	}
 
-	// ─── CLI mode: events ────────────────────────────────────────────
+	// ─── GUI mode (default) ────────────────────────────────────────────
+	webui := messenger.NewWebUI(m)
+	addr := ":8081"
+	fmt.Printf("\n  Web UI: http://localhost%s\n", addr)
+	fmt.Println("  Press Ctrl+C to stop")
+	go webui.BroadcastLoop(m.Events())
+	srv := &http.Server{Addr: addr, Handler: webui.Handler()}
+	go func() {
+		<-quit
+		srv.Shutdown(context.Background())
+		cancel()
+	}()
+	// Open browser
+	openURL("http://localhost" + addr)
+	if err := srv.ListenAndServe(); err != nil {
+		log.Info("web UI stopped")
+	}
+}
+
+func cliLoop(ctx context.Context, m *messenger.Engine, log *zap.Logger, quit chan os.Signal, cancel context.CancelFunc) {
 	events := m.Events().Subscribe("cli",
 		core.EvtMessageReceived,
 		core.EvtPeerOnline,
@@ -148,7 +154,6 @@ func main() {
 		}
 	}()
 
-	// ─── REPL ─────────────────────────────────────────────────────────────
 	scanner := bufio.NewScanner(os.Stdin)
 	printHelp()
 
@@ -175,6 +180,23 @@ func main() {
 		}
 		handleCommand(ctx, m, line, log)
 	}
+}
+
+func openURL(url string) {
+	var cmd string
+	var args []string
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "rundll32"
+		args = []string{"url.dll,FileProtocolHandler", url}
+	case "darwin":
+		cmd = "open"
+		args = []string{url}
+	default:
+		cmd = "xdg-open"
+		args = []string{url}
+	}
+	exec.Command(cmd, args...).Start()
 }
 
 func runGuidedSetup(ctx context.Context, m *messenger.Engine) {
