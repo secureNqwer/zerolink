@@ -134,7 +134,7 @@ fi
 # ── Поиск артефактов ──────────────────────────────────────────────────────────
 # libzt может назвать библиотеку по-разному в зависимости от версии
 LIB_FILE=""
-for name in libzt.a libzt-static.a libZeroTierSockets.a libzt.lib zt.a; do
+for name in libzt.a libzt-static.a libZeroTierSockets.a libzt.lib zt.a libzt_pic.a; do
   found=$(find "$CMAKE_BUILD" -name "$name" 2>/dev/null | head -1)
   if [[ -n "$found" ]]; then
     LIB_FILE="$found"
@@ -142,6 +142,21 @@ for name in libzt.a libzt-static.a libZeroTierSockets.a libzt.lib zt.a; do
     break
   fi
 done
+
+# If not found, try building zt-static target explicitly (some platforms only build PIC)
+if [[ -z "$LIB_FILE" ]]; then
+  echo "==> Попытка собрать zt-static отдельно..."
+  if cmake --build "$CMAKE_BUILD" --target zt-static --config Release -j "$JOBS" 2>/dev/null; then
+    for name in libzt.a libzt-static.a libzt_pic.a; do
+      found=$(find "$CMAKE_BUILD" -name "$name" 2>/dev/null | head -1)
+      if [[ -n "$found" ]]; then
+        LIB_FILE="$found"
+        echo "==> Найдена библиотека: $LIB_FILE"
+        break
+      fi
+    done
+  fi
+fi
 
 if [[ -z "$LIB_FILE" ]]; then
   echo ""
