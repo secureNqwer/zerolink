@@ -195,24 +195,17 @@ mkdir -p "$VENDOR_LIB" "$VENDOR_INC"
 LIBNAME=$(basename "$LIB_FILE")
 cp "$LIB_FILE" "$VENDOR_LIB/$LIBNAME"
 
-# На Termux/Android библиотеки могут быть разделены на несколько .a файлов
-# Объединяем все в одну libzerotiercore.a
-MAIN_LIB_NAME=$(basename "$LIB_FILE")
-ALL_LIBS=$(find "$CMAKE_BUILD" -name "*.a" ! -name "$MAIN_LIB_NAME" 2>/dev/null)
-if [[ -n "$ALL_LIBS" ]]; then
-  echo "==> Объединение всех .a библиотек → libzerotiercore.a"
+# Создаём libzerotiercore.a (CGO ищет -lzerotiercore)
+if [[ "$LIBNAME" == "libzt_pic.a" ]]; then
+  # Termux: несколько .a файлов → объединяем
   cp "$LIB_FILE" "$VENDOR_LIB/libzerotiercore.a"
-  TMPDIR=$(mktemp -d)
-  for lib in $ALL_LIBS; do
-    (cd "$TMPDIR" && ar x "$lib" 2>/dev/null)
+  for f in "$CMAKE_BUILD"/lib/libzto_pic.a "$CMAKE_BUILD"/lib/liblwip_pic.a; do
+    if [[ -f "$f" ]]; then
+      (cd "$(mktemp -d)" && ar x "$f" 2>/dev/null && ar r "$VENDOR_LIB/libzerotiercore.a" *.o 2>/dev/null) || true
+    fi
   done
-  (cd "$TMPDIR" && ar r "$VENDOR_LIB/libzerotiercore.a" *.o 2>/dev/null)
-  rm -rf "$TMPDIR"
-  echo "==> Готово: libzerotiercore.a содержит все объекты"
-else
-  if [[ "$LIBNAME" != "libzerotiercore.a" ]]; then
-    ln -sf "$LIBNAME" "$VENDOR_LIB/libzerotiercore.a"
-  fi
+elif [[ "$LIBNAME" != "libzerotiercore.a" ]]; then
+  ln -sf "$LIBNAME" "$VENDOR_LIB/libzerotiercore.a"
 fi
 
 cp "$HEADER" "$VENDOR_INC/ZeroTierSockets.h"
