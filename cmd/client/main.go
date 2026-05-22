@@ -124,6 +124,14 @@ func main() {
 		runGuidedSetup(ctx, m)
 	}
 
+	// ─── System tray ──────────────────────────────────────────────
+	if !*cliMode && runtime.GOARCH != "arm64" {
+		go gui.StartTray(func() {
+			m.DisconnectServer()
+			cancel()
+		})
+	}
+
 	// ─── CLI or Web UI mode ──────────────────────────────────────────
 	if *cliMode {
 		cliLoop(ctx, m, log, quit, cancel)
