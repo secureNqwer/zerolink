@@ -83,6 +83,12 @@ func main() {
 	}
 	defer m.Stop()
 
+	// ─── Desktop GUI mode ───────────────────────────────────────────
+	if *desktopMode {
+		gui.Run(m, nil)
+		return
+	}
+
 	fmt.Printf("\n  Messenger started\n")
 	fmt.Printf("  Node   : %s\n", m.LocalPeer().ID.NodeID)
 	fmt.Printf("  Key    : %s\n", m.LocalPeer().ID.Fingerprint)
@@ -118,11 +124,7 @@ func main() {
 		runGuidedSetup(ctx, m)
 	}
 
-	// ─── Mode selection ───────────────────────────────────────────
-	if *desktopMode {
-		gui.Run(m, nil)
-		return
-	}
+	// ─── CLI or Web UI mode ──────────────────────────────────────────
 	if *cliMode {
 		cliLoop(ctx, m, log, quit, cancel)
 		return
@@ -901,9 +903,8 @@ func checkUpdate() {
 	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
 		return
 	}
-	if rel.TagName > version.Version && rel.TagName != "" {
+	if rel.TagName != "" && strings.TrimPrefix(rel.TagName, "v") > strings.TrimPrefix(version.Version, "v") {
 		fmt.Printf("\nUpdate available: %s → %s\n", version.Version, rel.TagName)
-		fmt.Printf("  %s\n", rel.Body)
 		fmt.Printf("  Download: https://github.com/secureNqwer/zerolink/releases/tag/%s\n", rel.TagName)
 	}
 }
