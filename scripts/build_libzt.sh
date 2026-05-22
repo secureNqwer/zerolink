@@ -124,12 +124,12 @@ echo "==> Сборка (${JOBS} потоков)..."
 
 # Имя цели в libzt — "zt" или "zt-static" в зависимости от версии.
 # Пробуем оба варианта, если первый не существует.
-if cmake --build "$CMAKE_BUILD" --target zt --config Release -j "$JOBS" 2>/dev/null; then
-  echo "==> Цель 'zt' собрана."
-else
-  echo "==> Цель 'zt' не найдена, пробуем ALL..."
-  cmake --build "$CMAKE_BUILD" --config Release -j "$JOBS"
-fi
+for target in zt zt-static; do
+  if cmake --build "$CMAKE_BUILD" --target "$target" --config Release -j "$JOBS" 2>/dev/null; then
+    echo "==> Цель '$target' собрана."
+    break
+  fi
+done
 
 # ── Поиск артефактов ──────────────────────────────────────────────────────────
 # libzt может назвать библиотеку по-разному в зависимости от версии
