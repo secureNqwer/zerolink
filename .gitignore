@@ -32,3 +32,4 @@ identity.json
 .DS_Store
 Thumbs.db
 zerolink/
+!zerolink/PKGBUILD
