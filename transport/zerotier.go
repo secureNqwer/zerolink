@@ -35,7 +35,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -107,12 +110,19 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 		return fmt.Errorf("transport: zts_init_from_storage failed: %d", ret)
 	}
 
-	// Read our node ID immediately (available after init_from_storage)
-	nid := C.zts_node_get_id()
-	t.nodeID = core.NodeID(fmt.Sprintf("%010x", uint64(nid)))
+	// Read node ID from the identity file directly (avoids needing ZT node to be online)
+	nodeID := readNodeIDFromFile(t.cfg.ZeroTierDataDir)
+	if nodeID != "" {
+		t.nodeID = core.NodeID(nodeID)
+	} else {
+		t.log.Warn("could not read node ID from identity file, will get it after ZT starts")
+	}
 	t.log.Info("ZeroTier identity loaded", zap.String("node_id", string(t.nodeID)))
 
 	t.started = true
+
+	// Start the ZT node service
+	C.zts_node_start()
 
 	// Start networking in background — non-blocking startup
 	go t.startNetworking(ctx)
@@ -124,9 +134,6 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 // go online, join networks, open UDP socket.
 func (t *ZTTransport) startNetworking(ctx context.Context) {
 	t.log.Info("starting ZeroTier networking in background...")
-
-	// Register event callbacks
-	C.zts_node_start()
 
 	// Wait for the node to come online (up to 30 s in background)
 	deadline := time.Now().Add(30 * time.Second)
@@ -142,7 +149,7 @@ func (t *ZTTransport) startNetworking(ctx context.Context) {
 		return
 	}
 
-	t.log.Info("ZeroTier node online", zap.String("node_id", string(t.nodeID)))
+	t.log.Info("ZeroTier node online")
 
 	// Join configured networks
 	t.mu.Lock()
@@ -187,7 +194,9 @@ func (t *ZTTransport) Stop() error {
 		return nil
 	}
 	close(t.stopCh)
-	t.conn.Close()
+	if t.conn != nil {
+		t.conn.Close()
+	}
 	t.wg.Wait()
 	C.zts_node_stop()
 	C.zts_node_free()
@@ -540,6 +549,7 @@ func (t *ZTTransport) GetManagedIP(networkID core.NetworkID, timeout time.Durati
 	return nil, fmt.Errorf("timed out waiting for managed IP on network %s", networkID)
 }
 
+
 func nodeIDFromIP(ip net.IP) uint64 {
 	if ip4 := ip.To4(); ip4 != nil {
 		return uint64(ip4[2])<<8 | uint64(ip4[3])
@@ -566,4 +576,20 @@ func sockaddrToIP(sa *C.struct_zts_sockaddr_storage) net.IP {
 		return net.IP(b[:])
 	}
 	return nil
+}
+
+// readNodeIDFromFile parses the ZeroTier node ID from identity.public
+// in the given data directory. Returns empty string on failure.
+func readNodeIDFromFile(dataDir string) string {
+	path := filepath.Join(dataDir, "identity.public")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	// Format: "NODEID:0:SECRET..."
+	parts := strings.SplitN(strings.TrimSpace(string(data)), ":", 2)
+	if len(parts) < 1 || parts[0] == "" {
+		return ""
+	}
+	return parts[0]
 }
