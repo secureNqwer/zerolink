@@ -90,6 +90,7 @@ func NewZTTransport(cfg *core.Config, log *zap.Logger) *ZTTransport {
 
 // Start initialises libzerotiercore, reads or creates the identity from disk,
 // and opens a virtual UDP listener on ztUDPPort.
+// Returns immediately after loading the identity — networking goes online in the background.
 func (t *ZTTransport) Start(ctx context.Context) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -97,20 +98,37 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 		return errors.New("transport: already started")
 	}
 
-	// ── Init ZeroTier node ────────────────────────────────────────────────
+	// ── Init ZeroTier node (fast — loads identity from disk) ────────────
 	dataDir := C.CString(t.cfg.ZeroTierDataDir)
 	defer C.free(unsafe.Pointer(dataDir))
 
-	// zts_init_from_storage initialises the node and loads/creates an identity.
 	ret := C.zts_init_from_storage(dataDir)
 	if ret != C.ZTS_ERR_OK {
 		return fmt.Errorf("transport: zts_init_from_storage failed: %d", ret)
 	}
 
-	// Register event callbacks (implemented in zt_callbacks.c)
+	// Read our node ID immediately (available after init_from_storage)
+	nid := C.zts_node_get_id()
+	t.nodeID = core.NodeID(fmt.Sprintf("%010x", uint64(nid)))
+	t.log.Info("ZeroTier identity loaded", zap.String("node_id", string(t.nodeID)))
+
+	t.started = true
+
+	// Start networking in background — non-blocking startup
+	go t.startNetworking(ctx)
+
+	return nil
+}
+
+// startNetworking completes the async part of startup:
+// go online, join networks, open UDP socket.
+func (t *ZTTransport) startNetworking(ctx context.Context) {
+	t.log.Info("starting ZeroTier networking in background...")
+
+	// Register event callbacks
 	C.zts_node_start()
 
-	// Wait for the node to come online (up to 30 s)
+	// Wait for the node to come online (up to 30 s in background)
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if C.zts_node_is_online() == 1 {
@@ -118,17 +136,19 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+
 	if C.zts_node_is_online() != 1 {
-		return errors.New("transport: ZeroTier node failed to come online")
+		t.log.Warn("ZeroTier node failed to come online — running offline")
+		return
 	}
 
-	// Read our node ID
-	nid := C.zts_node_get_id()
-	t.nodeID = core.NodeID(fmt.Sprintf("%010x", uint64(nid)))
 	t.log.Info("ZeroTier node online", zap.String("node_id", string(t.nodeID)))
 
 	// Join configured networks
-	for _, nwid := range t.cfg.Networks {
+	t.mu.Lock()
+	networks := t.cfg.Networks
+	t.mu.Unlock()
+	for _, nwid := range networks {
 		if err := t.joinNetworkLocked(nwid); err != nil {
 			t.log.Warn("failed to join network", zap.String("network", string(nwid)), zap.Error(err))
 		}
@@ -139,11 +159,11 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 	addr := &net.UDPAddr{Port: port}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		// Try random port as fallback (avoids "address already in use" from stale processes)
 		addr2 := &net.UDPAddr{Port: 0}
 		conn2, err2 := net.ListenUDP("udp", addr2)
 		if err2 != nil {
-			return fmt.Errorf("transport: failed to listen UDP on any port: %w", err2)
+			t.log.Warn("failed to open UDP socket", zap.Error(err2))
+			return
 		}
 		conn = conn2
 		t.log.Warn("configured port busy, using random port",
@@ -151,13 +171,12 @@ func (t *ZTTransport) Start(ctx context.Context) error {
 			zap.Int("actual", conn.LocalAddr().(*net.UDPAddr).Port),
 		)
 	}
+	t.mu.Lock()
 	t.conn = conn
-	t.started = true
+	t.mu.Unlock()
 
 	t.wg.Add(1)
 	go t.recvLoop()
-
-	return nil
 }
 
 // Stop shuts down the ZeroTier node.

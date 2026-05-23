@@ -418,7 +418,10 @@ body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sa
 <div id="settings-modal" class="modal-overlay hidden">
   <div class="settings-modal">
     <div id="settings-level-0">
-      <h3>Настройки</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <h3 style="margin:0;">Настройки</h3>
+        <button onclick="closeSettings()" style="background:none;border:none;color:var(--text-sec);cursor:pointer;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;" title="Закрыть"><span class="material-symbols-rounded">close</span></button>
+      </div>
       <ul class="settings-list">
         <li onclick="settingsLevel(1)">
           <span class="material-symbols-rounded" style="color:var(--accent);">person</span>
@@ -530,8 +533,10 @@ function togglePassword(inputId, btnId) {
   const isPass = inp.type === 'password';
   inp.type = isPass ? 'text' : 'password';
   btn.innerHTML = isPass
-    ? '<svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M12,6.5C8.24,6.5 4.83,8.64 3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5Z"/></svg>'
-    : '<svg viewBox="0 0 24 24"><path d="M2,5.27L3.28,4L20,20.72L18.73,22L15.65,18.92C14.5,19.3 13.28,19.5 12,19.5C7,19.5 2.73,16.39 1,12C1.95,9.82 3.57,8 5.59,6.76L2,5.27M12,9A3,3 0 0,1 15,12C15,12.35 14.94,12.69 14.83,13L11,9.17C11.31,9.06 11.65,9 12,9M12,4.5C17,4.5 21.27,7.61 23,12C22.05,14.18 20.43,16 18.41,17.24L16,14.83C16.64,13.97 17,12.93 17,11.91V12C17,9.24 14.76,7 12,7C10.98,7 9.94,7.36 9.09,8L6.67,5.59C8.32,4.88 10.14,4.5 12,4.5Z"/></svg>';
+    ? '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M12,9A3,3 0 0,1 15,12A3,3 0 0,1 12,15A3,3 0 0,1 9,12A3,3 0 0,1 12,9M12,4.5C17,4.5 21.27,7.61 23,12C21.27,16.39 17,19.5 12,19.5C7,19.5 2.73,16.39 1,12C2.73,7.61 7,4.5 12,4.5M12,6.5C8.24,6.5 4.83,8.64 3.18,12C4.83,15.36 8.24,17.5 12,17.5C15.76,17.5 19.17,15.36 20.82,12C19.17,8.64 15.76,6.5 12,6.5Z"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M2,5.27L3.28,4L20,20.72L18.73,22L15.65,18.92C14.5,19.3 13.28,19.5 12,19.5C7,19.5 2.73,16.39 1,12C1.95,9.82 3.57,8 5.59,6.76L2,5.27M12,9A3,3 0 0,1 15,12C15,12.35 14.94,12.69 14.83,13L11,9.17C11.31,9.06 11.65,9 12,9M12,4.5C17,4.5 21.27,7.61 23,12C22.05,14.18 20.43,16 18.41,17.24L16,14.83C16.64,13.97 17,12.93 17,11.91V12C17,9.24 14.76,7 12,7C10.98,7 9.94,7.36 9.09,8L6.67,5.59C8.32,4.88 10.14,4.5 12,4.5Z"/></svg>';
+  // Keep Material icon fallback for the initial state
+}
 }
 
 document.getElementById('auth-btn').onclick = async () => {
@@ -596,8 +601,7 @@ function renderChats(list) {
   if (filtered.length === 0) { el.innerHTML = '<div class="empty-state">Нет чатов</div>'; return; }
   filtered.forEach(c => {
     const isDM = c.type === 0;
-    const otherMember = isDM ? c.members.find(m => m.peer_id && m.peer_id.node_id !== localNodeID) : null;
-    const displayName = isDM && otherMember ? (otherMember.peer_id.node_id || c.id).substring(0,8) : (c.name || c.id.substring(0,8));
+    const displayName = c.name || c.id.substring(0,8);
     const div = document.createElement('div');
     div.className = 'chat-item' + (c.id === currentChat ? ' active' : '');
     div.innerHTML = avatarStyle(displayName) + '<div class="info"><div class="name">'+htmlEscape(displayName)+'</div></div>';
@@ -747,6 +751,7 @@ async function doLogout() {
 }
 
 // Init
+let authPollInterval = null;
 window.onload = async () => {
   try {
     const res = await fetch('/api/auth/status');
@@ -754,12 +759,31 @@ window.onload = async () => {
     if (d.connected && d.authenticated) {
       token = d.token; username = d.username; localNodeID = d.node_id;
       showScreen('app'); connectWS(); loadData();
+      return;
     } else if (d.connected) {
       showScreen('auth');
-    } else {
-      showScreen('connect');
+      return;
     }
-  } catch(err) { showScreen('connect'); }
+  } catch(err) {}
+  // Not connected yet — poll until the background retry succeeds
+  showScreen('connect');
+  if (authPollInterval) clearInterval(authPollInterval);
+  authPollInterval = setInterval(async () => {
+    try {
+      const res = await fetch('/api/auth/status');
+      const d = await res.json();
+      if (d.authenticated && d.connected) {
+        clearInterval(authPollInterval);
+        authPollInterval = null;
+        token = d.token; username = d.username; localNodeID = d.node_id;
+        showScreen('app'); connectWS(); loadData();
+      } else if (d.connected) {
+        clearInterval(authPollInterval);
+        authPollInterval = null;
+        showScreen('auth');
+      }
+    } catch(e) {}
+  }, 3000);
 };
 </script>
 </body>

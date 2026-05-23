@@ -351,6 +351,27 @@ func (w *WebUI) handlePeers(rw http.ResponseWriter, r *http.Request) {
 
 func (w *WebUI) handleChats(rw http.ResponseWriter, r *http.Request) {
 	chats, _ := w.engine.ListChats()
+	// Enrich DM chats with the other member's display name
+	allPeers, _ := w.engine.ListPeers()
+	peerMap := make(map[string]*core.Peer)
+	for _, p := range allPeers {
+		peerMap[string(p.ID.NodeID)] = p
+	}
+	for i := range chats {
+		if chats[i].Type == core.ChatDirect && chats[i].Name == "" {
+			for _, m := range chats[i].Members {
+				if m.PeerID.NodeID != w.engine.LocalPeer().ID.NodeID {
+					if p, ok := peerMap[string(m.PeerID.NodeID)]; ok && p.DisplayName != "" {
+						chats[i].Name = p.DisplayName
+					} else {
+						// Fallback: show the first part of the fingerprint as a readable identifier
+						chats[i].Name = string(m.PeerID.NodeID)
+					}
+					break
+				}
+			}
+		}
+	}
 	json.NewEncoder(rw).Encode(chats)
 }
 

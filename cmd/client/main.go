@@ -115,14 +115,34 @@ func main() {
 		}
 		if err != nil {
 			fmt.Printf("Warning: server %s unreachable (%v)\n", auth.ServerAddr, err)
+			// Background retry: keep trying to connect
+			go func() {
+				retryTicker := time.NewTicker(5 * time.Second)
+				defer retryTicker.Stop()
+				for attempts := 0; attempts < 12; attempts++ {
+					select {
+					case <-ctx.Done():
+						return
+					case <-retryTicker.C:
+						if auth.Token != "" {
+							err = m.ConnectToServer(ctx, auth.ServerAddr, auth.Username, auth.Token)
+						} else {
+							err = m.ConnectToServer(ctx, auth.ServerAddr)
+						}
+						if err == nil {
+							fmt.Printf("\nReconnected to %s as %s\n", auth.ServerAddr, auth.Username)
+							return
+						}
+					}
+				}
+				fmt.Printf("\nCould not reconnect to %s after multiple attempts\n", auth.ServerAddr)
+			}()
 		} else {
 			fmt.Printf("Connected as %s\n", auth.Username)
 		}
 	}
 
-	if m.ServerRelay() == nil || !m.ServerRelay().Connected() {
-		runGuidedSetup(ctx, m)
-	}
+			fmt.Println("Server unreachable — will retry in background. Use the Web UI to connect.")
 
 	// ─── System tray ──────────────────────────────────────────────
 	if !*cliMode && runtime.GOARCH != "arm64" {

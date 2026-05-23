@@ -1208,13 +1208,17 @@ func (e *Engine) send(
 		}
 		flags |= core.FlagEncrypted
 	}
-	msg.Payload = finalPayload
-
+	// Save plaintext (or compressed-but-not-encrypted) for local display
+	msg.Payload = compressed
 	if err := e.store.SaveMessage(msg); err != nil {
 		return nil, err
 	}
 
-	if err := e.transmit(ctx, chat, msg); err != nil {
+	// Build a separate copy with the encrypted payload for network transmission
+	txMsg := *msg
+	txMsg.Payload = finalPayload
+
+	if err := e.transmit(ctx, chat, &txMsg); err != nil {
 		e.store.EnqueuePending(msg)
 		e.log.Warn("transmit failed, queued", zap.String("msg", string(msg.ID)), zap.Error(err))
 	} else {

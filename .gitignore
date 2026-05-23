@@ -1,6 +1,8 @@
 # Binaries
 bin/
 *.exe
+client
+server
 messenger-cli
 messenger-server
 
