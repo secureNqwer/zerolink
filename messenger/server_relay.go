@@ -65,6 +65,7 @@ type serverRelay struct {
 	username     string
 	token        string
 	registered   bool
+	closeOnce    sync.Once
 	responseCh   chan *RelayFrame // for synchronous request/response
 }
 
@@ -168,6 +169,9 @@ func (r *serverRelay) dial(ctx context.Context, addr string) error {
 	r.mu.Lock()
 	r.conn = conn
 	r.connected = true
+	if token != "" {
+		r.registered = true
+	}
 	r.mu.Unlock()
 	return nil
 }
@@ -531,7 +535,9 @@ func (r *serverRelay) IsRegistered() bool {
 
 // Close shuts down the relay connection.
 func (r *serverRelay) Close() {
-	close(r.stopCh)
+	r.closeOnce.Do(func() {
+		close(r.stopCh)
+	})
 	r.markDisconnected()
 	r.wg.Wait()
 }

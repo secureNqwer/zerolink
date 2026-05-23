@@ -32,7 +32,9 @@ type authData struct {
 	Token      string `json:"token"`
 }
 
-const authFile = "auth.json"
+func authFilePath() string {
+	return core.ExpandHome("~/.zerolink/auth.json")
+}
 
 func main() {
 	cliMode     := flag.Bool("cli", false, "start CLI mode")
@@ -140,9 +142,9 @@ func main() {
 		} else {
 			fmt.Printf("Connected as %s\n", auth.Username)
 		}
+	} else {
+		fmt.Println("Server unreachable — will retry in background. Use the Web UI to connect.")
 	}
-
-			fmt.Println("Server unreachable — will retry in background. Use the Web UI to connect.")
 
 	// ─── System tray ──────────────────────────────────────────────
 	if !*cliMode && runtime.GOARCH != "arm64" {
@@ -828,7 +830,7 @@ func printHelp() {
 // ─── Auth persistence ────────────────────────────────────────────────────
 
 func loadAuth() *authData {
-	data, err := os.ReadFile(authFile)
+	data, err := os.ReadFile(authFilePath())
 	if err != nil {
 		return nil
 	}
@@ -841,11 +843,11 @@ func loadAuth() *authData {
 
 func saveAuth(a *authData) {
 	if a == nil {
-		os.Remove(authFile)
+		os.Remove(authFilePath())
 		return
 	}
 	data, _ := json.Marshal(a)
-	os.WriteFile(authFile, data, 0o600)
+	os.WriteFile(authFilePath(), data, 0o600)
 }
 
 func httpPostJSON(url string, data map[string]string) (map[string]string, error) {

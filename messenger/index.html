@@ -537,7 +537,6 @@ function togglePassword(inputId, btnId) {
     : '<svg viewBox="0 0 24 24" width="20" height="20"><path d="M2,5.27L3.28,4L20,20.72L18.73,22L15.65,18.92C14.5,19.3 13.28,19.5 12,19.5C7,19.5 2.73,16.39 1,12C1.95,9.82 3.57,8 5.59,6.76L2,5.27M12,9A3,3 0 0,1 15,12C15,12.35 14.94,12.69 14.83,13L11,9.17C11.31,9.06 11.65,9 12,9M12,4.5C17,4.5 21.27,7.61 23,12C22.05,14.18 20.43,16 18.41,17.24L16,14.83C16.64,13.97 17,12.93 17,11.91V12C17,9.24 14.76,7 12,7C10.98,7 9.94,7.36 9.09,8L6.67,5.59C8.32,4.88 10.14,4.5 12,4.5Z"/></svg>';
   // Keep Material icon fallback for the initial state
 }
-}
 
 document.getElementById('auth-btn').onclick = async () => {
   const s = document.getElementById('server-addr').value.trim();
@@ -756,9 +755,13 @@ window.onload = async () => {
   try {
     const res = await fetch('/api/auth/status');
     const d = await res.json();
-    if (d.connected && d.authenticated) {
+    if (d.authenticated) {
       token = d.token; username = d.username; localNodeID = d.node_id;
       showScreen('app'); connectWS(); loadData();
+      if (!d.connected && d.server) {
+        // Try to reconnect in background
+        fetch('/api/server/connect', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({server:d.server})}).catch(()=>{});
+      }
       return;
     } else if (d.connected) {
       showScreen('auth');
@@ -772,11 +775,14 @@ window.onload = async () => {
     try {
       const res = await fetch('/api/auth/status');
       const d = await res.json();
-      if (d.authenticated && d.connected) {
+      if (d.authenticated) {
         clearInterval(authPollInterval);
         authPollInterval = null;
         token = d.token; username = d.username; localNodeID = d.node_id;
         showScreen('app'); connectWS(); loadData();
+        if (!d.connected && d.server) {
+          fetch('/api/server/connect', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({server:d.server})}).catch(()=>{});
+        }
       } else if (d.connected) {
         clearInterval(authPollInterval);
         authPollInterval = null;

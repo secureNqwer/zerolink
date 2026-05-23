@@ -81,8 +81,8 @@ type UserAccount struct {
 func DefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		ListenAddr:      ":8080",
-		DBPath:          "./server.db",
-		MediaDir:        "./server-media",
+		DBPath:          core.ExpandHome("~/.zerolink-server/server.db"),
+		MediaDir:        core.ExpandHome("~/.zerolink-server/media"),
 		MaxMsgAgeDays:   30,
 		MaxMediaSizeMB:  512,
 		PingInterval:    30 * time.Second,
@@ -92,7 +92,7 @@ func DefaultServerConfig() *ServerConfig {
 		LogLevel:        "info",
 		TokenSecret:     "change-me-in-production",
 		ZTPort:          9993,
-		ZTDataDir:       "./zt-server",
+		ZTDataDir:       core.ExpandHome("~/.zerolink-server/zt"),
 	}
 }
 

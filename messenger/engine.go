@@ -125,6 +125,14 @@ func (e *Engine) Start(ctx context.Context) error {
 			e.log.Warn("server relay unavailable, running serverless", zap.Error(err))
 		} else {
 			e.bus.Publish(core.Event{Type: core.EvtServerConnected, Timestamp: time.Now()})
+			// Sync missed messages on startup
+			go func() {
+				syncCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				defer cancel()
+				if err := e.SyncSince(syncCtx, time.Time{}); err != nil {
+					e.log.Debug("startup sync", zap.Error(err))
+				}
+			}()
 		}
 	}
 
@@ -232,6 +240,7 @@ func (e *Engine) ConnectToServer(ctx context.Context, addr string, auth ...strin
 	// Close existing connection if any
 	if e.serverConn != nil {
 		e.serverConn.Close()
+		e.serverConn = nil
 	}
 
 	sr := newServerRelay([]string{addr}, e.localPeer.ID, e.log)
@@ -247,6 +256,16 @@ func (e *Engine) ConnectToServer(ctx context.Context, addr string, auth ...strin
 	e.cfg.ServerAddresses = []string{addr}
 	e.cfg.UseServer = true
 	e.bus.Publish(core.Event{Type: core.EvtServerConnected, Timestamp: time.Now()})
+
+	// Sync missed messages in background
+	go func() {
+		syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := e.SyncSince(syncCtx, time.Time{}); err != nil {
+			e.log.Debug("initial sync", zap.Error(err))
+		}
+	}()
+
 	return nil
 }
 
@@ -1208,8 +1227,8 @@ func (e *Engine) send(
 		}
 		flags |= core.FlagEncrypted
 	}
-	// Save plaintext (or compressed-but-not-encrypted) for local display
-	msg.Payload = compressed
+	// Save plaintext for local display
+	msg.Payload = payload
 	if err := e.store.SaveMessage(msg); err != nil {
 		return nil, err
 	}

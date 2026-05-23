@@ -1,94 +1,67 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="https://github.com/secureNqwer/zerolink.git"
-DIR="${DIR:-$HOME/zerolink}"
+REPO="secureNqwer/zerolink"
+BIN="${BIN:-zerolink}"
 PREFIX="${PREFIX:-/usr/local}"
 
-echo "==> Zerolink Installer"
-echo ""
+# ── Utils ──────────────────────────────────────────────────────────────────
+info()  { printf "\r[ \033[00;34m..\033[0m ] %s\n" "$1"; }
+ok()    { printf "\r[ \033[00;32mOK\033[0m ] %s\n" "$1"; }
+err()   { printf "\r[ \033[0;31mER\033[0m ] %s\n" "$1"; exit 1; }
 
-# Detect architecture
+# ── Detect platform ────────────────────────────────────────────────────────
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)  PLATFORM="linux-amd64" ;;
-  aarch64|arm64) PLATFORM="linux-arm64" ;;
-  *)       PLATFORM="linux-$ARCH" ;;
+
+case "$OS" in
+  linux)   OS="linux" ;;
+  darwin)  OS="macos" ;;
+  mingw*|msys*|cygwin) OS="windows" ;;
+  *)       err "unsupported OS: $OS" ;;
 esac
 
-# Detect package manager
-if command -v apt &>/dev/null; then
-  PKG_MAN="apt"
-  BUILD_DEPS=$(echo "golang git cmake make gcc g++" && [ "$PLATFORM" = "linux-amd64" ] && echo "webkit2gtk" || echo "")
-elif command -v pacman &>/dev/null; then
-  PKG_MAN="pacman"
-  BUILD_DEPS=$(echo "go git cmake make base-devel" && [ "$PLATFORM" = "linux-amd64" ] && echo "webkit2gtk" || echo "")
-elif command -v dnf &>/dev/null; then
-  PKG_MAN="dnf"
-  BUILD_DEPS=$(echo "golang git cmake make gcc gcc-c++" && echo "")
-elif command -v zypper &>/dev/null; then
-  PKG_MAN="zypper"
-  BUILD_DEPS=$(echo "go git cmake make gcc gcc-c++" && echo "")
-else
-  echo "Warning: unknown package manager. Install deps manually: go, git, cmake, make, gcc"
-fi
+case "$ARCH" in
+  x86_64|amd64) ARCH="amd64" ;;
+  aarch64|arm64) ARCH="arm64" ;;
+  *) err "unsupported arch: $ARCH" ;;
+esac
 
-# Install build dependencies
-if [[ -n "${PKG_MAN:-}" ]]; then
-  echo "==> Installing build dependencies ($PKG_MAN)..."
-  case $PKG_MAN in
-    apt)    sudo apt update && sudo apt install -y $BUILD_DEPS ;;
-    pacman) sudo pacman -Sy --noconfirm $BUILD_DEPS ;;
-    dnf)    sudo dnf install -y $BUILD_DEPS ;;
-    zypper) sudo zypper install -y $BUILD_DEPS ;;
-  esac
-fi
+# ── Detect latest release ──────────────────────────────────────────────────
+info "Fetching latest release..."
+LATEST=$(curl -sL "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | cut -d'"' -f4)
+TAG="${TAG:-$LATEST}"
 
-# Clone or update repo
-if [[ -d "$DIR/.git" ]]; then
-  echo "==> Updating existing repo..."
-  cd "$DIR"
-  git pull --ff-only
-else
-  echo "==> Cloning repository..."
-  git clone "$REPO" "$DIR"
-  cd "$DIR"
-fi
+# ── Download & install ─────────────────────────────────────────────────────
+BASENAME="${BIN}-${TAG#v}-${OS}-${ARCH}"
+URL="https://github.com/$REPO/releases/download/$TAG/$BASENAME.tar.gz"
 
-# Try to download pre-built libzt, fall back to compiling
-if [[ ! -f vendor/zerotier/lib/libzt.a ]]; then
-  TAG=$(git describe --tags --always 2>/dev/null || echo "latest")
-  echo "==> Downloading pre-built libzt for $PLATFORM..."
-  if curl -sLf "https://github.com/secureNqwer/zerolink/releases/download/$TAG/libzt-$PLATFORM.tar.gz" -o /tmp/libzt.tar.gz; then
-    tar -xzf /tmp/libzt.tar.gz -C vendor 2>/dev/null && echo "  done"
-    rm -f /tmp/libzt.tar.gz
-  else
-    echo "  No pre-built libzt, building from source (5-10 min)..."
-    bash scripts/build_libzt.sh
-  fi
-fi
+TMP=$(mktemp -d)
+trap "rm -rf $TMP" EXIT
 
-# Build zerolink
-echo "==> Building Zerolink..."
-make client
+info "Downloading $BASENAME..."
+curl -sL "$URL" | tar -xz -C "$TMP"
 
-# Install to system
-echo "==> Installing to $PREFIX/bin..."
+info "Installing to $PREFIX/bin..."
 sudo install -d "$PREFIX/bin"
-sudo install -d "$PREFIX/share/icons/hicolor/256x256/apps"
-sudo install -m 755 bin/zerolink "$PREFIX/bin/zerolink"
-sudo install -m 644 icons/zerolink.png "$PREFIX/share/icons/hicolor/256x256/apps/zerolink.png"
+sudo install -m 755 "$TMP/$BIN" "$PREFIX/bin/$BIN"
 
-# Desktop entry
-if [[ -d "$PREFIX/share/applications" ]]; then
-  sudo install -d "$PREFIX/share/applications"
-  sed "s|EXEC|$PREFIX/bin/zerolink|g; s|ICON|zerolink|g" zerolink.desktop.in | sudo tee "$PREFIX/share/applications/zerolink.desktop" > /dev/null
+# Install server binary if present
+if [ -f "$TMP/${BIN}-server" ]; then
+  sudo install -m 755 "$TMP/${BIN}-server" "$PREFIX/bin/${BIN}-server"
 fi
 
-echo ""
-echo "✓ Zerolink installed!"
-echo "  Run: zerolink       — Web UI (default)"
-echo "  Run: zerolink -gui  — Desktop window"
-echo "  Run: zerolink -cli  — Terminal"
-echo ""
-echo "  To update: cd $DIR && git pull && make client && sudo make install"
+# Install desktop files
+if [ -d "$TMP/icons" ]; then
+  sudo install -d "$PREFIX/share/icons/hicolor/256x256/apps"
+  sudo install -m 644 "$TMP/icons/"* "$PREFIX/share/icons/hicolor/256x256/apps/"
+fi
+if [ -f "$TMP/zerolink.desktop" ]; then
+  sudo install -d "$PREFIX/share/applications"
+  sudo install -m 644 "$TMP/zerolink.desktop" "$PREFIX/share/applications/"
+fi
+
+ok "Zerolink ${TAG} installed!"
+echo "  Run: $BIN              — Web UI (http://localhost:8081)"
+echo "  Run: $BIN -cli        — Terminal"
+echo "  Run: $BIN -gui        — Desktop"

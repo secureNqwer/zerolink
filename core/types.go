@@ -6,8 +6,23 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 )
+
+// ExpandHome replaces a leading "~/" with the user's home directory.
+func ExpandHome(path string) string {
+	if !strings.HasPrefix(path, "~/") {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(home, path[2:])
+}
 
 // ─── Identity ────────────────────────────────────────────────────────────────
 
@@ -724,10 +739,10 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		ZeroTierPort:       9993,
-		ZeroTierDataDir:    "./zt",
+		ZeroTierDataDir:    ExpandHome("~/.zerolink/zt"),
 		ListenPort:         7777,
-		DBPath:             "./messenger.db",
-		MediaDir:           "./media",
+		DBPath:             ExpandHome("~/.zerolink/messenger.db"),
+		MediaDir:           ExpandHome("~/.zerolink/media"),
 		MaxMediaCacheMB:    512,
 		E2EEnabled:         true,
 		RotateKeysEvery:    7 * 24 * time.Hour,
@@ -743,7 +758,7 @@ func DefaultConfig() *Config {
 		PingInterval:       30 * time.Second,
 		LogLevel:           "info",
 		TransportMode:      TransportBoth,
-		IdentityFile:       "identity.json",
+		IdentityFile:       ExpandHome("~/.zerolink/identity.json"),
 	}
 }
 

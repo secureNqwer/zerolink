@@ -29,16 +29,18 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 4096,
 }
 
-const authFile = "auth.json"
-
 type authData struct {
 	ServerAddr string `json:"server_addr"`
 	Username   string `json:"username"`
 	Token      string `json:"token"`
 }
 
+func authFilePath() string {
+	return core.ExpandHome("~/.zerolink/auth.json")
+}
+
 func loadAuth() *authData {
-	data, err := os.ReadFile(authFile)
+	data, err := os.ReadFile(authFilePath())
 	if err != nil {
 		return nil
 	}
@@ -51,11 +53,11 @@ func loadAuth() *authData {
 
 func saveAuth(a *authData) {
 	if a == nil {
-		os.Remove(authFile)
+		os.Remove(authFilePath())
 		return
 	}
 	data, _ := json.Marshal(a)
-	os.WriteFile(authFile, data, 0o600)
+	os.WriteFile(authFilePath(), data, 0o600)
 }
 
 type WebUIClient struct {
@@ -163,6 +165,16 @@ func (w *WebUI) handleAuthStatus(rw http.ResponseWriter, r *http.Request) {
 		token = sr.Token()
 	}
 	
+	if username == "" || token == "" {
+		if auth := loadAuth(); auth != nil {
+			username = auth.Username
+			token = auth.Token
+			if token != "" {
+				authenticated = true
+			}
+		}
+	}
+	
 	nickname := ""
 	bio := ""
 	avatar := ""
@@ -172,9 +184,17 @@ func (w *WebUI) handleAuthStatus(rw http.ResponseWriter, r *http.Request) {
 		bio = w.engine.LocalPeer().StatusText
 	}
 	
+	serverAddr := ""
+	if sr != nil {
+		serverAddr = sr.Address()
+	} else if auth := loadAuth(); auth != nil {
+		serverAddr = auth.ServerAddr
+	}
+
 	json.NewEncoder(rw).Encode(map[string]interface{}{
 		"connected":     connected,
 		"authenticated": authenticated,
+		"server":        serverAddr,
 		"username":      username,
 		"token":         token,
 		"node_id":       nodeID,
@@ -386,7 +406,33 @@ func (w *WebUI) handleMessages(rw http.ResponseWriter, r *http.Request) {
 	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
 		msgs[i], msgs[j] = msgs[j], msgs[i]
 	}
-	json.NewEncoder(rw).Encode(msgs)
+	// Convert []byte Payload to string so json.Marshal doesn't base64-encode it
+	type msgJSON struct {
+		ID          core.MessageID      `json:"id"`
+		ChatID      core.ChatID         `json:"chat_id"`
+		SenderID    core.PeerID         `json:"sender_id"`
+		RecipientID *core.PeerID        `json:"recipient_id,omitempty"`
+		Type        core.MessageType    `json:"type"`
+		Payload     string              `json:"payload"`
+		Metadata    core.MessageMeta    `json:"meta"`
+		Status      core.DeliveryStatus `json:"status"`
+		SentAt      time.Time           `json:"sent_at"`
+		EditedAt    *time.Time          `json:"edited_at,omitempty"`
+		ReplyTo     *core.MessageID     `json:"reply_to,omitempty"`
+		ExpiresAt   *time.Time          `json:"expires_at,omitempty"`
+	}
+	out := make([]msgJSON, len(msgs))
+	for i, m := range msgs {
+		out[i] = msgJSON{
+			ID: m.ID, ChatID: m.ChatID, SenderID: m.SenderID,
+			RecipientID: m.RecipientID, Type: m.Type,
+			Payload: string(m.Payload),
+			Metadata: m.Metadata, Status: m.Status,
+			SentAt: m.SentAt, EditedAt: m.EditedAt,
+			ReplyTo: m.ReplyTo, ExpiresAt: m.ExpiresAt,
+		}
+	}
+	json.NewEncoder(rw).Encode(out)
 }
 
 func (w *WebUI) handleSend(rw http.ResponseWriter, r *http.Request) {
