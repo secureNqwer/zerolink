@@ -101,7 +101,7 @@ func main() {
 
 	// ─── Quit signal ───────────────────────────────────────────────────────
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
 	// ─── Auto-login or guided setup ───────────────────────────────────────
 	auth := loadAuth()
@@ -166,12 +166,13 @@ func main() {
 	go webui.BroadcastLoop(m.Events())
 	srv := &http.Server{Addr: addr, Handler: webui.Handler()}
 	webui.SetShutdownHandler(func() {
-		srv.Shutdown(context.Background())
-		cancel()
-		os.Exit(0)
+		// Signal quit channel to trigger graceful shutdown through the normal signal path
+		// This ensures all defers (including m.Stop()) run properly.
+		quit <- syscall.SIGTERM
 	})
 	go func() {
 		<-quit
+		log.Info("shutting down...")
 		srv.Shutdown(context.Background())
 		cancel()
 	}()
