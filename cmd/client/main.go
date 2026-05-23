@@ -89,7 +89,7 @@ func main() {
 		return
 	}
 
-	fmt.Printf("\n  Messenger started\n")
+	fmt.Printf("\n  %s %s (commit: %s, built: %s)\n", version.Name, version.Version, version.Commit, version.BuildTime)
 	fmt.Printf("  Node   : %s\n", m.LocalPeer().ID.NodeID)
 	fmt.Printf("  Key    : %s\n", m.LocalPeer().ID.Fingerprint)
 	fmt.Printf("  E2E    : %v\n\n", cfg.E2EEnabled)
